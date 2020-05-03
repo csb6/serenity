@@ -9,6 +9,10 @@ OBJS = \
     EventLoop.o \
     File.o \
     Gzip.o \
+    HttpJob.o \
+    HttpRequest.o \
+    HttpResponse.o \
+    IMAPClient.o \
     IODevice.o \
     LocalServer.o \
     LocalSocket.o \
