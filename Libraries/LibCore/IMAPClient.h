@@ -15,15 +15,16 @@ enum class IMAPResponsePrefix : char {
     Untagged,
     // Begins with some identifier (e.g. a001)
     Tagged,
-    // Begins with a '+' (response marked with '+' aren't really commands,
-    // but they are pretty close
+    // Begins with a '+' (responses marked with '+' aren't really commands,
+    // but they are pretty close)
     Continuation
 };
 
 enum class IMAPResponseStatus : char {
     Ok, // Command succeeded
     No, // Command failed
-    Bad // Command is unrecognized/has syntax error
+    Bad, // Command is unrecognized/has syntax error
+    None
 };
 
 enum class IMAPSystemFlag : char {
@@ -46,8 +47,6 @@ enum class IMAPConnectionState : char {
 struct IMAPMessage {
     // id representing a message; can't change within a session
     u32 uid;
-     // 1-based index in current mailbox; can change within a session
-    u16 sequence_number;
     // Standardized flags
     Vector<IMAPSystemFlag> system_flags;
     // User-created flags; can't start with '/'
