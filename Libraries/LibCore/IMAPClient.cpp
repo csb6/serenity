@@ -26,6 +26,49 @@ static IMAPResponseStatus get_response_status(StringView response)
     return IMAPResponseStatus::None;
 }
 
+static Vector<String> parse_fetch_message(StringView message)
+{
+    enum class State : char {
+        Start, InString
+    };
+    
+    size_t i = 0;
+    State curr_state = State::Start;
+    Vector<String> result;
+    StringBuilder curr_string;
+    while(i < message.length()) {
+        const char curr = message[i];
+        switch(curr_state) {
+        case State::Start:
+            if(curr == '\"') {
+                curr_state = State::InString;
+            } else if(curr == ' ') {
+                // End of an identifier
+                result.append(curr_string.to_string());
+                curr_string.clear();
+            } else {
+                // Build up an identifier
+                curr_string.append(curr);
+            }
+            ++i;
+            break;
+        case State::InString:
+            if(curr == '\"') {
+                // End of the string
+                result.append(curr_string.to_string());
+                curr_string.clear();
+                curr_state = State::Start;
+            } else {
+                // Build up the string
+                curr_string.append(curr);
+            }
+            ++i;
+            break;
+        };
+    }
+    return result;
+}
+
 
 IMAPClient::IMAPClient(StringView address, int port)
 {
@@ -45,7 +88,6 @@ IMAPClient::IMAPClient(StringView address, int port)
                 if(response.is_empty())
                     // For some reason servers sometimes send empty messages
                     continue;
-                dbg() << "Got a response: " << response;
                 m_queue_lock.lock();
                 m_message_queue.append(response);
                 m_queue_lock.unlock();
@@ -100,7 +142,7 @@ bool IMAPClient::select(StringView mailbox)
         dbg() << "Step 3: Selected mailbox: " << mailbox;
         const IMAPResponseStatus res_status = get_response_status(response);
         if(res_status == IMAPResponseStatus::Ok) {
-            m_state = IMAPConnectionState::Authenticated;
+            m_state = IMAPConnectionState::Selected;
             dbg() << "Selected mailbox successfully";
             return true;
         } else {
@@ -109,6 +151,33 @@ bool IMAPClient::select(StringView mailbox)
         }
     }
     return status;
+}
+
+String IMAPClient::fetch(StringView sequence, StringView parameter)
+{
+    if(m_state != IMAPConnectionState::Selected) {
+        dbg() << "Cannot fetch: improper current state";
+        return {};
+    }
+
+    StringBuilder command;
+    command.append("fetch ");
+    command.append(sequence);
+    command.append(" ");
+    command.append(parameter);
+    bool status = send_command(command.string_view());
+    if(!status) {
+        dbg() << "Fetch failed";
+        return {};
+    }
+
+    ByteBuffer response{receive_response()};
+    Vector<String> fetch_data{parse_fetch_message(response)};
+    for(const auto& each : fetch_data) {
+        dbg() << each;
+    }
+    
+    return {};
 }
 
 StringBuilder IMAPClient::new_message_id()
@@ -140,7 +209,7 @@ ByteBuffer IMAPClient::receive_response()
     while(true) {
         m_queue_lock.lock();
         if(!m_message_queue.is_empty()) {
-            response = m_message_queue.take_last();
+            response = m_message_queue.take_first();
             m_queue_lock.unlock();
             return response;
         }

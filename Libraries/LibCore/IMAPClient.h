@@ -71,6 +71,7 @@ public:
     virtual ~IMAPClient() override;
     bool login(StringView username, StringView password);
     bool select(StringView mailbox);
+    String fetch(StringView sequence, StringView parameter);
 private:
     StringBuilder new_message_id();
     bool send_command(StringView command);
