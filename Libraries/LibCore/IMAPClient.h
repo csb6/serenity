@@ -1,6 +1,8 @@
 #pragma once
 
 #include <LibCore/TCPSocket.h>
+#include <LibThread/Thread.h>
+#include <LibThread/Lock.h>
 #include <AK/ByteBuffer.h>
 #include <AK/String.h>
 #include <AK/StringBuilder.h>
@@ -72,8 +74,12 @@ public:
 private:
     StringBuilder new_message_id();
     bool send_command(StringView command);
+    ByteBuffer receive_response();
 
     RefPtr<Core::TCPSocket> m_socket;
+    RefPtr<LibThread::Thread> m_receive_thread;
+    Vector<ByteBuffer> m_message_queue;
+    LibThread::Lock m_queue_lock;
     int m_message_id = 1;
     IMAPConnectionState m_state = IMAPConnectionState::NotAuthenticated;
 };
